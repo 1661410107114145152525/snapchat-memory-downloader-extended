@@ -21,6 +21,7 @@ This is super easy to setup, hope this help you too!
   - GPS coordinates, so your media locations show up on maps
   - Timezone offset tags (crucial for accurate display in iCloud/iPhone)
 - Cleans up extracted folders and ZIP files after processing
+- **🔒 Security**: URL validation ensures downloads only come from trusted Snapchat domains
 - Works on both Windows and macOS/Linux (requires Python 3.9+ and [ExifTool](https://exiftool.org/))
 
 ---
@@ -53,4 +54,31 @@ This is super easy to setup, hope this help you too!
   - <img width="797" height="254" alt="image" src="https://github.com/user-attachments/assets/973eb6c4-6b73-4e5f-ae78-72416ba8bf67" />
 
   It should start downloading your data.
+
+---
+
+## Security
+
+This tool includes security features to protect against malicious URL injection:
+- **URL Validation**: All download URLs are validated to ensure they come from trusted Snapchat domains only
+- **Domain Whitelist**: Only `snapchat.com`, `sc-cdn.net`, `snap-dev.net`, and `snapkit.co` domains (and their subdomains) are allowed
+- **Protection Against**: Malware downloads, SSRF attacks, and data exfiltration attempts
+
+For more details, see [SECURITY.md](SECURITY.md).
+
+If you see security warnings about blocked URLs, review your `memories_history.json` file to ensure it's from an official Snapchat data export.
+
+---
+
+## Testing
+
+Run the test suite to verify everything works correctly:
+
+```bash
+# Run URL validation tests
+python -m unittest test_url_validation.py -v
+
+# Run integration tests
+python -m unittest test_integration.py -v
+```
 
