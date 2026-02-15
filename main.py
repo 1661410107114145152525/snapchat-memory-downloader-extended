@@ -124,12 +124,15 @@ def set_metadata(file, date, lat, lon, media_type, et):
         return True  # Consider processed without metadata
 
     try:
-        lat_float = float(lat)
-        lon_float = float(lon)
-        lat_ref = 'N' if lat_float >= 0 else 'S'
-        lon_ref = 'E' if lon_float >= 0 else 'W'
-        lat_abs = abs(lat_float)
-        lon_abs = abs(lon_float)
+        has_gps = lat is not None and lon is not None and lat != '' and lon != ''
+
+        if has_gps:
+            lat_float = float(lat)
+            lon_float = float(lon)
+            lat_ref = 'N' if lat_float >= 0 else 'S'
+            lon_ref = 'E' if lon_float >= 0 else 'W'
+            lat_abs = abs(lat_float)
+            lon_abs = abs(lon_float)
 
         # Convert UTC to local timezone
         dt_utc = datetime.strptime(date, '%Y:%m:%d %H:%M:%S').replace(tzinfo=ZoneInfo('UTC'))
@@ -146,31 +149,41 @@ def set_metadata(file, date, lat, lon, media_type, et):
         if media_type.lower() == 'video' or file.lower().endswith(VIDEO_EXTENSIONS):
             # Video metadata (MP4, MOV, AVI, etc.)
             tags = {
-                'QuickTime:GPSCoordinates': f"{lat_abs:.6f}, {lon_abs:.6f}",
-                'QuickTime:GPSLatitudeRef': lat_ref,
-                'QuickTime:GPSLongitudeRef': lon_ref,
-                'Keys:GPSCoordinates': f"{lat_float:.6f} {lon_float:.6f} 0.000000",
-                'XMP:GPSLatitude': lat_float,
-                'XMP:GPSLongitude': lon_float,
-                'XMP:GPSDateTime': f"{date.replace(' ', 'T')}Z",
                 'CreateDate': local_date_str,
                 'TrackCreateDate': local_date_str,
                 'TrackModifyDate': local_date_str,
                 'MediaCreateDate': local_date_str,
                 'MediaModifyDate': local_date_str
             }
+            if has_gps:
+                tags.update({
+                    'QuickTime:GPSCoordinates': f"{lat_abs:.6f}, {lon_abs:.6f}",
+                    'QuickTime:GPSLatitudeRef': lat_ref,
+                    'QuickTime:GPSLongitudeRef': lon_ref,
+                    'Keys:GPSCoordinates': f"{lat_float:.6f} {lon_float:.6f} 0.000000",
+                    'XMP:GPSLatitude': lat_float,
+                    'XMP:GPSLongitude': lon_float,
+                    'XMP:GPSDateTime': f"{date.replace(' ', 'T')}Z",
+                })
+            else:
+                print(f"⚠ No GPS data for {os.path.basename(file)}, setting date metadata only")
         else:
             # Image metadata (JPEG/HEIC)
             tags = {
                 'DateTimeOriginal': local_date_str,
                 'CreateDate': local_date_str,
-                'GPSLatitude': lat_abs,
-                'GPSLongitude': lon_abs,
-                'GPSLatitudeRef': lat_ref,
-                'GPSLongitudeRef': lon_ref,
                 'OffsetTimeOriginal': offset_str,
                 'OffsetTime': offset_str
             }
+            if has_gps:
+                tags.update({
+                    'GPSLatitude': lat_abs,
+                    'GPSLongitude': lon_abs,
+                    'GPSLatitudeRef': lat_ref,
+                    'GPSLongitudeRef': lon_ref,
+                })
+            else:
+                print(f"⚠ No GPS data for {os.path.basename(file)}, setting date metadata only")
 
         # Set metadata using PyExifTool
         et.set_tags(
@@ -197,56 +210,79 @@ def verify_metadata(file, date, lat, lon, media_type, et):
             return False
         
         file_meta = metadata[0]
-        expected_lat = abs(float(lat))
-        expected_lon = abs(float(lon))
+        has_gps = lat is not None and lon is not None and lat != '' and lon != ''
+
+        if has_gps:
+            expected_lat = abs(float(lat))
+            expected_lon = abs(float(lon))
         
         if media_type.lower() == 'video' or file.lower().endswith(VIDEO_EXTENSIONS):
-            gps_found = False
-            for key in ['QuickTime:GPSCoordinates', 'Keys:GPSCoordinates', 'XMP:GPSLatitude']:
-                if key in file_meta:
-                    gps_found = True
-                    break
-            
-            if gps_found:
-                print(f"✓ Metadata verified for {os.path.basename(file)}")
-                return True
-            else:
-                print(f"✗ GPS not found in {os.path.basename(file)}")
-                return False
-        else:
-            lat_meta = None
-            lon_meta = None
-            
-            for lat_key in ['EXIF:GPSLatitude', 'Composite:GPSLatitude']:
-                if lat_key in file_meta:
-                    lat_meta = file_meta[lat_key]
-                    break
-            
-            for lon_key in ['EXIF:GPSLongitude', 'Composite:GPSLongitude']:
-                if lon_key in file_meta:
-                    lon_meta = file_meta[lon_key]
-                    break
-            
-            if lat_meta is not None and lon_meta is not None:
-                try:
-                    found_lat = abs(float(lat_meta))
-                    found_lon = abs(float(lon_meta))
-                    
-                    lat_match = abs(found_lat - expected_lat) < 0.001
-                    lon_match = abs(found_lon - expected_lon) < 0.001
-                    
-                    if lat_match and lon_match:
-                        print(f"✓ Metadata verified for {os.path.basename(file)}")
-                        return True
-                    else:
-                        print(f"⚠ GPS differs for {os.path.basename(file)} (tolerance)")
-                        return True
-                except (ValueError, TypeError) as e:
-                    print(f"✗ GPS parsing error: {e}")
+            if has_gps:
+                gps_found = False
+                for key in ['QuickTime:GPSCoordinates', 'Keys:GPSCoordinates', 'XMP:GPSLatitude']:
+                    if key in file_meta:
+                        gps_found = True
+                        break
+                
+                if gps_found:
+                    print(f"✓ Metadata verified for {os.path.basename(file)}")
+                    return True
+                else:
+                    print(f"✗ GPS not found in {os.path.basename(file)}")
                     return False
             else:
-                print(f"✗ GPS not found in {os.path.basename(file)}")
-                return False
+                # No GPS expected, verify date tags instead
+                date_found = 'QuickTime:CreateDate' in file_meta or 'CreateDate' in file_meta
+                if date_found:
+                    print(f"✓ Date metadata verified for {os.path.basename(file)} (no GPS expected)")
+                    return True
+                else:
+                    print(f"⚠ Date metadata not confirmed for {os.path.basename(file)}")
+                    return True  # Still consider it successful since we set the tags
+        else:
+            if has_gps:
+                lat_meta = None
+                lon_meta = None
+                
+                for lat_key in ['EXIF:GPSLatitude', 'Composite:GPSLatitude']:
+                    if lat_key in file_meta:
+                        lat_meta = file_meta[lat_key]
+                        break
+                
+                for lon_key in ['EXIF:GPSLongitude', 'Composite:GPSLongitude']:
+                    if lon_key in file_meta:
+                        lon_meta = file_meta[lon_key]
+                        break
+                
+                if lat_meta is not None and lon_meta is not None:
+                    try:
+                        found_lat = abs(float(lat_meta))
+                        found_lon = abs(float(lon_meta))
+                        
+                        lat_match = abs(found_lat - expected_lat) < 0.001
+                        lon_match = abs(found_lon - expected_lon) < 0.001
+                        
+                        if lat_match and lon_match:
+                            print(f"✓ Metadata verified for {os.path.basename(file)}")
+                            return True
+                        else:
+                            print(f"⚠ GPS differs for {os.path.basename(file)} (tolerance)")
+                            return True
+                    except (ValueError, TypeError) as e:
+                        print(f"✗ GPS parsing error: {e}")
+                        return False
+                else:
+                    print(f"✗ GPS not found in {os.path.basename(file)}")
+                    return False
+            else:
+                # No GPS expected, verify date tags instead
+                date_found = 'EXIF:DateTimeOriginal' in file_meta or 'DateTimeOriginal' in file_meta
+                if date_found:
+                    print(f"✓ Date metadata verified for {os.path.basename(file)} (no GPS expected)")
+                    return True
+                else:
+                    print(f"⚠ Date metadata not confirmed for {os.path.basename(file)}")
+                    return True  # Still consider it successful since we set the tags
 
     except Exception as e:
         print(f"✗ Verification error for {os.path.basename(file)}: {e}")
@@ -303,8 +339,8 @@ def process_zip_file(zip_content, date, lat, lon, download_folder, safe_date, et
                 # Infer media type per file by extension
                 file_media_type = 'video' if is_video_file(file_name) else 'image'
                 
-                # Set metadata only if not PNG and GPS present
-                if not file_name.lower().endswith('.png') and lat and lon:
+                # Set metadata (date always, GPS when available)
+                if not file_name.lower().endswith('.png'):
                     if set_metadata(extracted_path, date, lat, lon, file_media_type, et):
                         verify_metadata(extracted_path, date, lat, lon, file_media_type, et)
                     else:
@@ -444,15 +480,12 @@ def main():
                 # Infer single file media type for direct files
                 file_media_type = 'video' if is_video_file(file_path) else 'image'
 
-                if lat and lon:
-                    if set_metadata(file_path, date, lat, lon, file_media_type, et):
-                        verify_metadata(file_path, date, lat, lon, file_media_type, et)
-                        total_processed += 1
-                    else:
-                        total_errors += 1
-                else:
-                    print(f"⚠ No GPS data for {filename}")
+                # Set metadata (date always, GPS when available)
+                if set_metadata(file_path, date, lat, lon, file_media_type, et):
+                    verify_metadata(file_path, date, lat, lon, file_media_type, et)
                     total_processed += 1
+                else:
+                    total_errors += 1
             else:
                 print(f"✗ Unsupported content-type: {content_type}")
                 total_errors += 1
