@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 import exiftool
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+from urllib.parse import urlparse
 
 
 headers = {
@@ -26,6 +27,59 @@ SUPPORTED_TYPES = (
     '.webp', '.mkv', '.m4v'
 )
 VIDEO_EXTENSIONS = ('.mp4', '.mov', '.avi', '.wmv', '.mkv', '.m4v')
+
+# Trusted Snapchat domains for download URLs
+TRUSTED_DOMAINS = (
+    'snapchat.com',
+    'sc-cdn.net',
+    'snap-dev.net',
+    'snapkit.co',
+)
+
+
+def is_trusted_url(url):
+    """
+    Validate that a URL points to a trusted Snapchat domain.
+    
+    This prevents potential security vulnerabilities where malicious URLs
+    could be injected into the memories_history.json file to:
+    - Download malware
+    - Conduct SSRF attacks
+    - Exfiltrate data
+    
+    Args:
+        url (str): The URL to validate
+        
+    Returns:
+        bool: True if the URL is from a trusted domain, False otherwise
+    """
+    if not url:
+        return False
+    
+    try:
+        parsed = urlparse(url)
+        
+        # Ensure we have a valid scheme (http/https)
+        if parsed.scheme not in ('http', 'https'):
+            return False
+        
+        # Extract the hostname
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        
+        hostname_lower = hostname.lower()
+        
+        # Check if hostname matches or is a subdomain of trusted domains
+        for trusted_domain in TRUSTED_DOMAINS:
+            if hostname_lower == trusted_domain or hostname_lower.endswith('.' + trusted_domain):
+                return True
+        
+        return False
+        
+    except (ValueError, AttributeError):
+        # Invalid URL format
+        return False
 
 
 def is_supported_file(filename):
@@ -309,6 +363,14 @@ def main():
             url = item.get("Media Download Url")
             if not url:
                 print(f"✗ Missing download URL, skipping")
+                total_errors += 1
+                continue
+            
+            # Security: Validate URL is from a trusted Snapchat domain
+            if not is_trusted_url(url):
+                print(f"✗ SECURITY: Untrusted URL detected, skipping for safety")
+                print(f"   URL: {url}")
+                print(f"   Only Snapchat domains are allowed")
                 total_errors += 1
                 continue
 
