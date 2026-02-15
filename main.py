@@ -56,7 +56,7 @@ def set_metadata(file, date, lat, lon, media_type, et):
 
         # Convert UTC to local timezone
         dt_utc = datetime.strptime(date, '%Y:%m:%d %H:%M:%S').replace(tzinfo=ZoneInfo('UTC'))
-        local_tz = ZoneInfo('America/Toronto')
+        local_tz = ZoneInfo('Europe/Berlin')
         dt_local = dt_utc.astimezone(local_tz)
         local_date_str = dt_local.strftime('%Y:%m:%d %H:%M:%S')
         
@@ -384,3 +384,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
