@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 import exiftool
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+from urllib.parse import urlparse
 
 
 headers = {
@@ -26,6 +27,82 @@ SUPPORTED_TYPES = (
     '.webp', '.mkv', '.m4v'
 )
 VIDEO_EXTENSIONS = ('.mp4', '.mov', '.avi', '.wmv', '.mkv', '.m4v')
+
+# Trusted Snapchat domains for download URLs
+TRUSTED_DOMAINS = (
+    'snapchat.com',
+    'sc-cdn.net',
+    'snap-dev.net',
+    'snapkit.co',
+)
+
+# Note: If you encounter legitimate Snapchat URLs being blocked,
+# please open a GitHub issue with the domain name so it can be added.
+
+
+def is_trusted_url(url):
+    """
+    Validate that a URL points to a trusted Snapchat domain.
+    
+    This prevents potential security vulnerabilities where malicious URLs
+    could be injected into the memories_history.json file to:
+    - Download malware
+    - Conduct SSRF attacks
+    - Exfiltrate data
+    
+    Args:
+        url (str): The URL to validate
+        
+    Returns:
+        bool: True if the URL is from a trusted domain, False otherwise
+    """
+    if not url:
+        return False
+    
+    try:
+        parsed = urlparse(url)
+        
+        # Ensure we have HTTPS only (no HTTP for security)
+        if parsed.scheme != 'https':
+            return False
+        
+        # Extract the hostname
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        
+        hostname_lower = hostname.lower()
+        
+        # Block localhost and private IP ranges (defense in depth)
+        # This prevents DNS rebinding and other bypass attempts
+        if hostname_lower in ('localhost', '127.0.0.1', '::1', '0.0.0.0'):
+            return False
+        
+        # Block private IP ranges (simplified check for common cases)
+        if hostname_lower.startswith('192.168.') or hostname_lower.startswith('10.'):
+            return False
+        
+        # Block 172.16.0.0/12 range (172.16.0.0 - 172.31.255.255)
+        if hostname_lower.startswith('172.'):
+            parts = hostname_lower.split('.')
+            if len(parts) >= 2:
+                try:
+                    second_octet = int(parts[1])
+                    if 16 <= second_octet <= 31:
+                        return False
+                except (ValueError, IndexError):
+                    pass
+        
+        # Check if hostname matches or is a subdomain of trusted domains
+        for trusted_domain in TRUSTED_DOMAINS:
+            if hostname_lower == trusted_domain or hostname_lower.endswith('.' + trusted_domain):
+                return True
+        
+        return False
+        
+    except (ValueError, AttributeError):
+        # Invalid URL format
+        return False
 
 
 def is_supported_file(filename):
@@ -309,6 +386,14 @@ def main():
             url = item.get("Media Download Url")
             if not url:
                 print(f"✗ Missing download URL, skipping")
+                total_errors += 1
+                continue
+            
+            # Security: Validate URL is from a trusted Snapchat domain
+            if not is_trusted_url(url):
+                print(f"✗ SECURITY: Untrusted URL detected, skipping for safety")
+                print(f"   URL: {url}")
+                print(f"   Only Snapchat domains are allowed")
                 total_errors += 1
                 continue
 
