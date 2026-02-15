@@ -78,26 +78,20 @@ def is_trusted_url(url):
         if hostname_lower in ('localhost', '127.0.0.1', '::1', '0.0.0.0'):
             return False
         
-        # Block private IP ranges
-        if hostname_lower.startswith('192.168.') or \
-           hostname_lower.startswith('10.') or \
-           hostname_lower.startswith('172.16.') or \
-           hostname_lower.startswith('172.17.') or \
-           hostname_lower.startswith('172.18.') or \
-           hostname_lower.startswith('172.19.') or \
-           hostname_lower.startswith('172.20.') or \
-           hostname_lower.startswith('172.21.') or \
-           hostname_lower.startswith('172.22.') or \
-           hostname_lower.startswith('172.23.') or \
-           hostname_lower.startswith('172.24.') or \
-           hostname_lower.startswith('172.25.') or \
-           hostname_lower.startswith('172.26.') or \
-           hostname_lower.startswith('172.27.') or \
-           hostname_lower.startswith('172.28.') or \
-           hostname_lower.startswith('172.29.') or \
-           hostname_lower.startswith('172.30.') or \
-           hostname_lower.startswith('172.31.'):
+        # Block private IP ranges (simplified check for common cases)
+        if hostname_lower.startswith('192.168.') or hostname_lower.startswith('10.'):
             return False
+        
+        # Block 172.16.0.0/12 range (172.16.0.0 - 172.31.255.255)
+        if hostname_lower.startswith('172.'):
+            parts = hostname_lower.split('.')
+            if len(parts) >= 2:
+                try:
+                    second_octet = int(parts[1])
+                    if 16 <= second_octet <= 31:
+                        return False
+                except (ValueError, IndexError):
+                    pass
         
         # Check if hostname matches or is a subdomain of trusted domains
         for trusted_domain in TRUSTED_DOMAINS:
