@@ -26,9 +26,9 @@ The following domains are trusted for downloads:
 
 The URL validation function (`is_trusted_url()`) enforces the following security rules:
 
-1. **URL Scheme**: Only `http` and `https` schemes are allowed
+1. **HTTPS Only**: Only `https` scheme is allowed (no unencrypted HTTP for security)
 2. **Domain Matching**: The hostname must exactly match or be a subdomain of a trusted domain
-3. **No Internal IPs**: Requests to localhost, 127.0.0.1, or private IP ranges are blocked
+3. **No Internal IPs**: Requests to localhost, 127.0.0.1, or private IP ranges are explicitly blocked (SSRF protection)
 4. **Case-Insensitive**: Domain matching is case-insensitive for security
 5. **Complete Validation**: Malformed URLs are rejected
 
@@ -46,8 +46,9 @@ https://media.snap-dev.net/file.mp4
 ```
 https://evil.com/malware.exe
 https://attacker.com/steal-data.jpg
-http://localhost/admin
+https://localhost/admin
 https://192.168.1.1/internal
+http://snapchat.com/file.jpg  (HTTP not allowed, only HTTPS)
 ftp://snapchat.com/file.jpg
 https://snapchat.com.evil.com/file.jpg
 ```

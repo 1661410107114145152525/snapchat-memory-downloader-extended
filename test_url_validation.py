@@ -27,7 +27,6 @@ class TestURLValidation(unittest.TestCase):
             'https://test.snap-dev.net/media/file.jpg',
             'https://snapkit.co/media/file.jpg',
             'https://cdn.snapkit.co/media/file.jpg',
-            'http://snapchat.com/media/file.jpg',  # http is also allowed
         ]
         
         for url in valid_urls:
@@ -58,8 +57,9 @@ class TestURLValidation(unittest.TestCase):
                 )
 
     def test_reject_invalid_schemes(self):
-        """Test that non-HTTP(S) schemes are rejected"""
+        """Test that non-HTTPS schemes are rejected"""
         invalid_scheme_urls = [
+            'http://snapchat.com/file.jpg',  # http not allowed, only https
             'ftp://snapchat.com/file.jpg',
             'file:///etc/passwd',
             'javascript:alert(1)',
@@ -78,12 +78,17 @@ class TestURLValidation(unittest.TestCase):
     def test_reject_localhost_and_internal_ips(self):
         """Test that localhost and internal IPs are rejected (SSRF protection)"""
         ssrf_urls = [
-            'http://localhost/admin',
-            'http://127.0.0.1/admin',
-            'http://192.168.1.1/admin',
-            'http://10.0.0.1/admin',
-            'http://172.16.0.1/admin',
-            'http://0.0.0.0/admin',
+            'https://localhost/admin',
+            'https://127.0.0.1/admin',
+            'https://192.168.1.1/admin',
+            'https://192.168.0.1/admin',
+            'https://10.0.0.1/admin',
+            'https://10.10.10.10/admin',
+            'https://172.16.0.1/admin',
+            'https://172.20.5.10/admin',
+            'https://172.31.255.255/admin',
+            'https://0.0.0.0/admin',
+            'https://[::1]/admin',  # IPv6 localhost
         ]
         
         for url in ssrf_urls:

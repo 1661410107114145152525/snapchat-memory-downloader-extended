@@ -36,6 +36,9 @@ TRUSTED_DOMAINS = (
     'snapkit.co',
 )
 
+# Note: If you encounter legitimate Snapchat URLs being blocked,
+# please open a GitHub issue with the domain name so it can be added.
+
 
 def is_trusted_url(url):
     """
@@ -59,8 +62,8 @@ def is_trusted_url(url):
     try:
         parsed = urlparse(url)
         
-        # Ensure we have a valid scheme (http/https)
-        if parsed.scheme not in ('http', 'https'):
+        # Ensure we have HTTPS only (no HTTP for security)
+        if parsed.scheme != 'https':
             return False
         
         # Extract the hostname
@@ -69,6 +72,32 @@ def is_trusted_url(url):
             return False
         
         hostname_lower = hostname.lower()
+        
+        # Block localhost and private IP ranges (defense in depth)
+        # This prevents DNS rebinding and other bypass attempts
+        if hostname_lower in ('localhost', '127.0.0.1', '::1', '0.0.0.0'):
+            return False
+        
+        # Block private IP ranges
+        if hostname_lower.startswith('192.168.') or \
+           hostname_lower.startswith('10.') or \
+           hostname_lower.startswith('172.16.') or \
+           hostname_lower.startswith('172.17.') or \
+           hostname_lower.startswith('172.18.') or \
+           hostname_lower.startswith('172.19.') or \
+           hostname_lower.startswith('172.20.') or \
+           hostname_lower.startswith('172.21.') or \
+           hostname_lower.startswith('172.22.') or \
+           hostname_lower.startswith('172.23.') or \
+           hostname_lower.startswith('172.24.') or \
+           hostname_lower.startswith('172.25.') or \
+           hostname_lower.startswith('172.26.') or \
+           hostname_lower.startswith('172.27.') or \
+           hostname_lower.startswith('172.28.') or \
+           hostname_lower.startswith('172.29.') or \
+           hostname_lower.startswith('172.30.') or \
+           hostname_lower.startswith('172.31.'):
+            return False
         
         # Check if hostname matches or is a subdomain of trusted domains
         for trusted_domain in TRUSTED_DOMAINS:
