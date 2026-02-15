@@ -110,12 +110,14 @@ class TestVerifyMetadataWithMissingGPS(unittest.TestCase):
 
     def test_verify_video_without_gps_checks_date(self):
         """Verification of video without GPS should check date tags"""
+        # Date value is in local timezone (Europe/Berlin = UTC+1 in January)
         self.mock_et.get_metadata.return_value = [{'CreateDate': '2024:01:15 13:00:00'}]
         result = verify_metadata('/tmp/test.mp4', self.date, None, None, 'video', self.mock_et)
         self.assertTrue(result)
 
     def test_verify_image_without_gps_checks_date(self):
         """Verification of image without GPS should check date tags"""
+        # Date value is in local timezone (Europe/Berlin = UTC+1 in January)
         self.mock_et.get_metadata.return_value = [{'DateTimeOriginal': '2024:01:15 13:00:00'}]
         result = verify_metadata('/tmp/test.jpg', self.date, None, None, 'image', self.mock_et)
         self.assertTrue(result)
@@ -128,7 +130,8 @@ class TestVerifyMetadataWithMissingGPS(unittest.TestCase):
 
     def test_verify_video_with_gps_checks_gps(self):
         """Verification of video with GPS should check GPS tags"""
-        self.mock_et.get_metadata.return_value = [{'QuickTime:GPSCoordinates': '37.7749, 122.4194'}]
+        # GPS coordinates stored as absolute values in QuickTime format
+        self.mock_et.get_metadata.return_value = [{'QuickTime:GPSCoordinates': '37.774900, 122.419400'}]
         result = verify_metadata('/tmp/test.mp4', self.date, '37.7749', '-122.4194', 'video', self.mock_et)
         self.assertTrue(result)
 
